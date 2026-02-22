@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VOID_EXPLORER_MOBILE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        /* Prevent bounce and scrolling on mobile */
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background: #000; 
+            cursor: none; font-family: 'SF Pro Display', sans-serif;
+            touch-action: none;
+        }
+        canvas { width: 100vw; height: 100vh; display: block; filter: contrast(170%) saturate(280%) brightness(110%); }
+        
+        .nav {
+            position: fixed;
+            bottom: 70px; /* Pushed up for the larger link */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px; 
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(20px);
+            padding: 12px 20px;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            pointer-events: auto;
+            user-select: none;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 800;
+            transition: 0.3s;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1px;
+            outline: none;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        .btn:hover { background: #fff; color: #000; }
+        .btn:active { transform: scale(0.9); background: #00f2fe; }
+        .dim-counter { font-size: 14px; font-weight: 700; min-width: 140px; text-align: center; color: #00f2fe; }
+
+        /* Upgraded Aberia Link */
+        .footer-link {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 110;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px; /* Bigger text */
+            text-decoration: underline;
+            letter-spacing: 1.5px;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .footer-link:hover { color: #00f2fe; transform: translateX(-50%) scale(1.05); }
+
+        @media (max-width: 480px) {
+            .nav { bottom: 60px; width: 90%; justify-content: space-between; }
+            .dim-counter { min-width: 100px; font-size: 12px; }
+            .footer-link { bottom: 20px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+
+    <div class="nav">
+        <button class="btn" id="prevBtn">Back</button>
+        <div class="dim-counter" id="dimDisplay">DIMENSION 001</div>
+        <button class="btn" id="nextBtn">Next</button>
+    </div>
+
+    <!-- Updated Aberia Link with Capital A -->
+    <a href="https://aberia.site" target="_blank" class="footer-link">Aberia.site</a>
+
+<script type="x-shader/x-fragment" id="fs">
+    precision mediump float; 
+    uniform vec2 u_res;
+    uniform vec2 u_mouse;
+    uniform float u_time;
+    uniform float u_variant; 
+
+    vec3 palette(float t, float var) {
+        vec3 a = vec3(0.5, 0.5, 0.5);
+        vec3 b = vec3(0.5, 0.5, 0.5);
+        vec3 c = vec3(1.0, 1.0, 1.0);
+        float s = fract(var * 0.432);
+        vec3 d = vec3(s, s + 0.3, s + 0.6);
+        return a + b * cos(6.28318 * (c * t + d));
+    }
+
+    mat2 rot(float a) {
+        float s = sin(a), c = cos(a);
+        return mat2(c, -s, s, c);
+    }
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy * 2.0 - u_res.xy) / min(u_res.y, u_res.x);
+        vec2 mouse = (u_mouse.xy * 2.0 - u_res.xy) / min(u_res.y, u_res.x);
+        vec2 uv0 = uv;
+        vec3 finalColor = vec3(0.0);
+        float mDist = length(uv - mouse);
+        float mWarp = 0.4 / (mDist + 0.5);
+        uv *= (1.0 - mWarp * 0.6);
+        float seed = u_variant * 13.567;
+        for (float i = 0.0; i < 4.0; i++) {
+            uv = abs(uv) - (0.2 + fract(seed * 0.1) * 0.5);
+            uv *= rot(seed + i * 0.5 + u_time * 0.1); 
+            uv = fract(uv * (1.2 + sin(seed + u_time * 0.2))) - 0.5;
+            float d = length(uv) * exp(-length(uv0));
+            vec3 col = palette(length(uv0) + i * 0.4 + u_time * 0.3 + mWarp, u_variant);
+            float freq = 6.0 + mod(seed, 10.0);
+            d = sin(d * freq + u_time) / freq;
+            d = abs(d);
+            d = pow(0.008 / d, 1.3);
+            finalColor += col * d;
+        }
+        float glow = smoothstep(0.2, 0.0, mDist);
+        finalColor += palette(u_time, u_variant + 10.0) * glow * 0.6;
+        gl_FragColor = vec4(finalColor, 1.0);
+    }
+</script>
+
+<script>
+    const canvas = document.getElementById('glCanvas');
+    const gl = canvas.getContext('webgl', { antialias: false });
+    let currentDim = 1, totalDims = 100, holdInterval;
+
+    const vs = `attribute vec2 p; void main(){gl_Position=vec4(p,0,1);}`;
+    const fsSrc = document.getElementById('fs').text;
+    const prog = gl.createProgram();
+    const s = (t, src) => {
+        const sh = gl.createShader(t);
+        gl.shaderSource(sh, src); gl.compileShader(sh);
+        gl.attachShader(prog, sh);
+    };
+    s(gl.VERTEX_SHADER, vs); s(gl.FRAGMENT_SHADER, fsSrc);
+    gl.linkProgram(prog); gl.useProgram(prog);
+
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+    const pLoc = gl.getAttribLocation(prog, "p");
+    gl.enableVertexAttribArray(pLoc); gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(prog, "u_res"), uMouse = gl.getUniformLocation(prog, "u_mouse"), uTime = gl.getUniformLocation(prog, "u_time"), uVar = gl.getUniformLocation(prog, "u_variant");
+
+    let mX = 0, mY = 0, tMX = 0, tMY = 0;
+    const handleMove = e => {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        tMX = clientX; tMY = clientY;
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchstart', handleMove, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+
+    function updateUI() { document.getElementById('dimDisplay').innerText = `DIMENSION ${currentDim.toString().padStart(3, '0')}`; }
+    function changeDim(dir) { currentDim += dir; if(currentDim > totalDims) currentDim = 1; if(currentDim < 1) currentDim = totalDims; updateUI(); }
+    function startCycle(dir) { changeDim(dir); holdInterval = setInterval(() => changeDim(dir), 150); }
+    function stopCycle() { clearInterval(holdInterval); }
+
+    const nBtn = document.getElementById('nextBtn'), pBtn = document.getElementById('prevBtn');
+    nBtn.onmousedown = () => startCycle(1); nBtn.onmouseup = nBtn.onmouseleave = stopCycle;
+    pBtn.onmousedown = () => startCycle(-1); pBtn.onmouseup = pBtn.onmouseleave = stopCycle;
+    nBtn.ontouchstart = (e) => { e.preventDefault(); startCycle(1); }; nBtn.ontouchend = stopCycle;
+    pBtn.ontouchstart = (e) => { e.preventDefault(); startCycle(-1); }; pBtn.ontouchend = stopCycle;
+
+    function render(t) {
+        if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        mX += (tMX - mX) * 0.08; mY += (tMY - mY) * 0.08;
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform2f(uMouse, mX, canvas.height - mY);
+        gl.uniform1f(uTime, t * 0.001);
+        gl.uniform1f(uVar, currentDim);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+    }
+    render(0);
+</script>
+</body>
+</html>
